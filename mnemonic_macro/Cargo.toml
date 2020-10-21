@@ -1,0 +1,15 @@
+[package]
+name = "mnemonic_macro"
+version = "0.1.0"
+authors = ["Raytwo <raytwost@gmail.com>"]
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "1", features = ["extra-traits", "full"] }
+quote = "1.0"
+skyline = { git = "https://github.com/ultimate-research/skyline-rs.git" }
+aarch64-decode = { git = "https://github.com/jam1garner/aarch64-decode" }
+proc-macro2 = "1"

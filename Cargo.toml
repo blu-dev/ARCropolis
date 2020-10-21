@@ -24,6 +24,8 @@ skyline = { git = "https://github.com/ultimate-research/skyline-rs.git" }
 skyline-web = { git = "https://github.com/skyline-rs/skyline-web" }
 skyline_smash = { git = "https://github.com/ultimate-research/skyline-smash.git" }
 skyline-update = { git = "https://github.com/skyline-rs/skyline-update" }
+mnemonic_macro = { path = "./mnemonic_macro" }
+aarch64-decode = { git = "https://github.com/jam1garner/aarch64-decode" }
 
 [patch.crates-io]
 getrandom = { git = "https://github.com/skyline-rs/getrandom" }
