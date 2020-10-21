@@ -103,7 +103,11 @@ pub fn search_offsets() {
         smash::resource::LOADED_TABLES_OFFSET = 0x50567a0;
         smash::resource::RES_SERVICE_OFFSET = 0x50567a8;
     }
-            if let Some(offset) = mnemonic_macro::mnemonic_search!(Add, Str, Ldr)() {
+            if let Some(offset) = mnemonic_macro::mnemonic_search!(
+                Add32AddsubImm,
+                Ldrsb32BlLdstRegoff
+                => Str64LdstRegoff,
+            ) {
                 IDK_OFFSET = offset
             }
         find_offsets!(
