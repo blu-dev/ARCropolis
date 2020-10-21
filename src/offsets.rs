@@ -65,7 +65,7 @@ impl<InnerIter: Iterator<Item = usize> + Sized> Iterator for TextIter<InnerIter>
     fn next(&mut self) -> Option<Self::Item> {
         let ptr = self.inner.next()? as *const u32;
         let raw_instr = unsafe { *ptr };
-        Some((ptr as usize, decode_a64(raw_instr).unwrap()))
+        Some((ptr as usize, decode_a64(raw_instr).unwrap_or(Instr::Nop)))
     }
 }
 
@@ -100,36 +100,299 @@ macro_rules! find_offsets {
 
 pub fn search_offsets() {
     unsafe {
-        smash::resource::LOADED_TABLES_OFFSET = 0x50567a0;
-        smash::resource::RES_SERVICE_OFFSET = 0x50567a8;
-    }
-            if let Some(offset) = mnemonic_macro::mnemonic_search!(
-                Add32AddsubImm,
-                Ldrsb32BlLdstRegoff
-                => Str64LdstRegoff,
-            ) {
-                IDK_OFFSET = offset
-            }
-        find_offsets!(
-            //(IDK_OFFSET, IDK_SEARCH_CODE),
-            //(ADD_IDX_TO_TABLE1_AND_TABLE2_OFFSET, ADD_IDX_TO_TABLE1_AND_TABLE2_SEARCH_CODE),
-            //(LOOKUP_STREAM_HASH_OFFSET, LOOKUP_STREAM_HASH_SEARCH_CODE),
-            // (PARSE_EFF_NUTEXB_OFFSET, PARSE_EFF_NUTEXB_SEARCH_CODE),
-            // (PARSE_EFF_OFFSET, PARSE_EFF_SEARCH_CODE),
-            // (PARSE_PARAM_OFFSET, PARSE_PARAM_SEARCH_CODE),
-            // (PARSE_MODEL_XMB_OFFSET, PARSE_MODEL_XMB_SEARCH_CODE),
-            // (PARSE_ARC_FILE_OFFSET, PARSE_ARC_FILE_SEARCH_CODE),
-            // (PARSE_FONT_FILE_OFFSET, PARSE_FONT_FILE_SEARCH_CODE),
-            // (PARSE_NUMATB_NUTEXB_OFFSET, PARSE_NUMATB_NUTEXB_SEARCH_CODE),
-            // (PARSE_NUMSHEXB_FILE_OFFSET, PARSE_NUMSHEXB_FILE_SEARCH_CODE),
-            // (PARSE_NUMATB_FILE_OFFSET, PARSE_NUMATB_FILE_SEARCH_CODE),
-            // (PARSE_NUMDLB_FILE_OFFSET, PARSE_NUMDLB_FILE_SEARCH_CODE),
-            // (PARSE_LOG_XMB_OFFSET, PARSE_LOG_XMB_SEARCH_CODE),
-            // (PARSE_MODEL_XMB_2_OFFSET, PARSE_MODEL_XMB_2_SEARCH_CODE),
-            //(TITLE_SCREEN_VERSION_OFFSET, TITLE_SCREEN_VERSION_SEARCH_CODE),
-        );
+        // All of this was written during Smash 9.0.0
 
-        println!("IDK_OFFSET after find_offset: {:08x}", IDK_OFFSET);
+
+
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Stp64LdstpairPre,
+        //     Stp64LdstpairOff,
+        //     Stp64LdstpairOff,
+        //     Stp64LdstpairOff,
+        //     Add64AddsubImm,
+        //     Orr32LogImm,
+        //     Subs32AddsubShift,
+        //     BOnlyCondbranch,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        // ) {
+        //     IDK_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Stp64LdstpairPre,
+        //     Stp64LdstpairOff,
+        //     Stp64LdstpairOff,
+        //     Add64AddsubImm,
+        //     Ldr32LdstPos,
+        //     Subs32AddsubShift,
+        //     BOnlyCondbranch,
+        //     Ldr64LdstPos,
+        //     Orr64LogShift,
+        //     Orr64LogShift,
+        // ) {
+        //     ADD_IDX_TO_TABLE1_AND_TABLE2_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr32LdstPos,
+        //     Add64AddsubShift,
+        //     Cbz32Compbranch,
+        //     Subs64SAddsubImm,
+        //     Csinc64Condsel,
+        //     Sbfm64MBitfield,
+        //     Add64AddsubShift,
+        //     Ldr64LdstImmpost,
+        // ) {
+        //     LOOKUP_STREAM_HASH_OFFSET = offset
+        // }
+
+        if let Some(offset) = mnemonic_macro::mnemonic_search!(
+            => Ldr64LdstPos,
+            BOnlyBranchImm,
+            Orr64LogShift,
+            AdrpOnlyPcreladdr,
+            Ldr64LdstPos,
+            Stur64LdstUnscaled,
+            Stp64LdstpairOff,
+            Ldr64LdstPos,
+            Ldr64LdstPos,
+            Ldr64LdstPos,
+        ) {
+            PARSE_EFF_NUTEXB_OFFSET = offset
+        }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr32LdstPos,
+        //     Subs32AddsubShift,
+        //     Orr64LogShift,
+        //     BOnlyCondbranch,
+        //     Ldr64LdstPos,
+        //     Add64AddsubShift,
+        //     Ldrb32LdstPos,
+        //     Cbz32Compbranch,
+        //     Ubfm64MBitfield,
+        //     Ldr32LdstRegoff,
+        // ) {
+        //     PARSE_EFF_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     Cbz64Compbranch,
+        //     Add64AddsubImm,
+        //     Stp64LdstpairOff,
+        //     Ldrsw64LdstPos,
+        //     Add64AddsubShift,
+        //     Str64LdstPos,
+        //     Ldrsw64LdstPos,
+        //     Add64AddsubShift,
+        //     Str64LdstPos
+        // ) {
+        //     PARSE_PARAM_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     Ldr64LdstPos,
+        //     Orr64LogShift,
+        //     Ldr64LdstPos,
+        //     BlOnlyBranchImm,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Str32LdstPos,
+        //     Ldr64LdstPos,
+        // ) {
+        //     PARSE_MODEL_XMB_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     Orr64LogShift,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr32LdstPos,
+        //     Subs32AddsubShift,
+        //     BOnlyCondbranch,
+        // ) {
+        //     PARSE_ARC_FILE_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     Ldrb32LdstPos,
+        //     Cbz32Compbranch,
+        //     Ret64RBranchReg,
+        //     Ldr64LdstPos,
+        //     Cbz64Compbranch,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Br64BranchReg,
+        // ) {
+        //     PARSE_FONT_FILE_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     Orr64LogShift,
+        //     AdrpOnlyPcreladdr,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr32LdstPos,
+        //     Subs32AddsubShift,
+        // ) {
+        //     PARSE_NUMATB_NUTEXB_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     AdrpOnlyPcreladdr,
+        //     Add64AddsubImm,
+        //     Str64LdstPos,
+        //     AdrpOnlyPcreladdr,
+        //     BOnlyBranchImm,
+        //     Orr64LogShift,
+        //     Movz32Movewide,
+        //     Orr32LogImm,
+        // ) {
+        //     PARSE_NUMSHEXB_FILE_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     Orr64LogShift,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr32LdstPos,
+        //     Subs32AddsubShift,
+        //     BOnlyCondbranch,
+        // ) {
+        //     PARSE_NUMATB_FILE_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     Str64LdstImmpre,
+        //     Stp64LdstpairOff,
+        //     Add64AddsubImm,
+        //     Orr64LogShift,
+        //     BlOnlyBranchImm,
+        //     Cbz64Compbranch,
+        //     Ldp64LdstpairOff,
+        //     Orr64LogShift,
+        // ) {
+        //     PARSE_NUMDLB_FILE_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     Orr64LogShift,
+        //     Orr32LogImm,
+        //     Orr32LogImm,
+        //     BlOnlyBranchImm,
+        //     Orr64LogShift,
+        //     Cbnz64Compbranch,
+        //     AdrpOnlyPcreladdr,
+        //     Ldr64LdstPos,
+        // ) {
+        //     PARSE_LOG_XMB_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     UdfOnlyPermUndef,
+        //     AdrpOnlyPcreladdr,
+        //     Add64AddsubImm,
+        //     Str64LdstPos,
+        //     Ldr64LdstPos,
+        //     Cbz64Compbranch,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        // ) {
+        //     PARSE_MODEL_XMB_2_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Str64LdstImmpre,
+        //     Stp64LdstpairOff,
+        //     Stp64LdstpairOff,
+        //     Add64AddsubImm,
+        //     Sub64AddsubImm,
+        //     Orr64LogShift,
+        //     Orr64LogShift,
+        //     Add64AddsubImm,
+        //     Orr32LogImm,
+        //     Orr32LogShift,
+        // ) {
+        //     TITLE_SCREEN_VERSION_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => AdrpOnlyPcreladdr,
+        //     Ldr64LdstPos,
+        //     Orr32LogShift,
+        //     BlOnlyBranchImm,
+        //     Ldr64LdstPos,
+        //     Ldr32LdstPos,
+        //     Subs32AddsubShift,
+        //     BOnlyCondbranch,
+        //     Ldr64LdstPos,
+        //     Add64AddsubExt,
+        // ) {
+        //     smash::resource::LOADED_TABLES_OFFSET = offset
+        // }
+
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => AdrpOnlyPcreladdr,
+        //     Ldr64LdstPos,
+        //     Strb32LdstPos,
+        //     Ldrh32LdstPos,
+        //     Strh32LdstPos,
+        //     Cbz64Compbranch,
+        //     Add64AddsubImm,
+        //     And64LogImm,
+        //     Subs32SAddsubImm,
+        //     BOnlyCondbranch,
+        // ) {
+        //     smash::resource::RES_SERVICE_OFFSET = offset
+        // }
+
+        // find_offsets!(
+        //     (IDK_OFFSET, IDK_SEARCH_CODE),
+        //     (ADD_IDX_TO_TABLE1_AND_TABLE2_OFFSET, ADD_IDX_TO_TABLE1_AND_TABLE2_SEARCH_CODE),
+        //     (LOOKUP_STREAM_HASH_OFFSET, LOOKUP_STREAM_HASH_SEARCH_CODE),
+        //     // (PARSE_EFF_NUTEXB_OFFSET, &[u8;0]),
+        //     // (PARSE_EFF_OFFSET, &[u8;0]),
+        //     // (PARSE_PARAM_OFFSET, &[u8;0]),
+        //     // (PARSE_MODEL_XMB_OFFSET, &[u8;0]),
+        //     // (PARSE_ARC_FILE_OFFSET, &[u8;0]),
+        //     // (PARSE_FONT_FILE_OFFSET, &[u8;0]),
+        //     // (PARSE_NUMATB_NUTEXB_OFFSET, &[u8;0]),
+        //     // (PARSE_NUMSHEXB_FILE_OFFSET, &[u8;0]),
+        //     // (PARSE_NUMATB_FILE_OFFSET, &[u8;0]),
+        //     // (PARSE_NUMDLB_FILE_OFFSET, &[u8;0]),
+        //     // (PARSE_LOG_XMB_OFFSET, &[u8;0]),
+        //     // (PARSE_MODEL_XMB_2_OFFSET, &[u8;0]),
+        //     (TITLE_SCREEN_VERSION_OFFSET, TITLE_SCREEN_VERSION_SEARCH_CODE),
+        // );
     }
 }
 

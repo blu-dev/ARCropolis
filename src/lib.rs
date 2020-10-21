@@ -388,11 +388,11 @@ pub fn main() {
     offsets::search_offsets();
 
     install_hooks!(
-        // idk,
-        // add_idx_to_table1_and_table2,
-        // stream::lookup_by_stream_hash,
-        // parse_eff_nutexb,
-        // parse_eff,
+        //idk,
+        //add_idx_to_table1_and_table2,
+        //stream::lookup_by_stream_hash,
+        parse_eff_nutexb,
+        //parse_eff,
         // parse_param_file,
         // parse_model_xmb,
         // parse_model_xmb2,
@@ -406,7 +406,7 @@ pub fn main() {
         // parse_numatb_nutexb,
         // // parse_bntx_file,
         // parse_nus3bank_file,
-        change_version_string,
+        //change_version_string,
     );
 
     println!(
