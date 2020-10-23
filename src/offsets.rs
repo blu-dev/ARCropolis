@@ -22,26 +22,6 @@ pub static mut PARSE_MODEL_XMB_2_OFFSET:usize = 0x3406f44;
 pub static mut TITLE_SCREEN_VERSION_OFFSET:usize = 0x35ba960;
 pub static mut PARSE_NUS3BANK_FILE_OFFSET:usize = 0x35528f4;
 
-static IDK_SEARCH_CODE: &[u8] = &[
-    0xf8, 0x5f, 0xbc, 0xa9, 0xf6, 0x57, 0x01, 0xa9, 0xf4, 0x4f, 0x02, 0xa9, 0xfd, 0x7b, 0x03, 0xa9,
-    0xfd, 0xc3, 0x00, 0x91, 0xe8, 0x5f, 0x00, 0x32, 0x3f, 0x00, 0x08, 0x6b,
-];
-
-static ADD_IDX_TO_TABLE1_AND_TABLE2_SEARCH_CODE: &[u8] = &[
-    0xf6, 0x57, 0xbd, 0xa9, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91,
-    0x08, 0x18, 0x40, 0xb9, 0x1f, 0x01, 0x01, 0x6b,
-];
-
-static LOOKUP_STREAM_HASH_SEARCH_CODE: &[u8] = &[
-    0x29, 0x58, 0x40, 0xf9, 0x28, 0x60, 0x40, 0xf9, 0x2a, 0x05, 0x40, 0xb9, 0x09, 0x0d, 0x0a, 0x8b,
-    0xaa, 0x01, 0x00, 0x34, 0x5f, 0x01, 0x00, 0xf1,
-];
-
-static TITLE_SCREEN_VERSION_SEARCH_CODE: &[u8] = &[
-    0xfc, 0x0f, 0x1d, 0xf8, 0xf4, 0x4f, 0x01, 0xa9, 0xfd, 0x7b, 0x02, 0xa9, 0xfd, 0x83, 0x00, 0x91,
-    0xff, 0x07, 0x40, 0xd1, 0xf4, 0x03, 0x01, 0xaa, 0xf3, 0x03, 0x00, 0xaa,
-];
-
 pub struct TextIter<InnerIter: Iterator<Item = usize> + Sized> {
     inner: InnerIter
 }
@@ -103,8 +83,6 @@ pub fn search_offsets() {
         // All of this was written during Smash 9.0.0
 
 
-
-
         // if let Some(offset) = mnemonic_macro::mnemonic_search!(
         //     => Stp64LdstpairPre,
         //     Stp64LdstpairOff,
@@ -150,20 +128,20 @@ pub fn search_offsets() {
         //     LOOKUP_STREAM_HASH_OFFSET = offset
         // }
 
-        if let Some(offset) = mnemonic_macro::mnemonic_search!(
-            => Ldr64LdstPos,
-            BOnlyBranchImm,
-            Orr64LogShift,
-            AdrpOnlyPcreladdr,
-            Ldr64LdstPos,
-            Stur64LdstUnscaled,
-            Stp64LdstpairOff,
-            Ldr64LdstPos,
-            Ldr64LdstPos,
-            Ldr64LdstPos,
-        ) {
-            PARSE_EFF_NUTEXB_OFFSET = offset
-        }
+        // if let Some(offset) = mnemonic_macro::mnemonic_search!(
+        //     => Ldr64LdstPos,
+        //     BOnlyBranchImm,
+        //     Orr64LogShift,
+        //     AdrpOnlyPcreladdr,
+        //     Ldr64LdstPos,
+        //     Stur64LdstUnscaled,
+        //     Stp64LdstpairOff,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        //     Ldr64LdstPos,
+        // ) {
+        //     PARSE_EFF_NUTEXB_OFFSET = offset
+        // }
 
         // if let Some(offset) = mnemonic_macro::mnemonic_search!(
         //     => Ldr32LdstPos,
