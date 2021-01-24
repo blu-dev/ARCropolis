@@ -310,7 +310,8 @@ impl FileCtx {
                 return;
             },
         }
-        
+    
+        // Store FileInfoIndice
         self.index = arc.get_file_info_from_hash(self.hash).unwrap().hash_index_2;
 
         // Backup the Subfile for when file watching is added
@@ -321,7 +322,7 @@ impl FileCtx {
 
         if subfile.decomp_size < self.filesize { 
             subfile.decomp_size = self.filesize;
-            info!("[ARC::Patching] File '{}' has a new patched decompressed size: {:#x}",self.path.display().bright_yellow(),subfile.decomp_size.bright_red());
+            info!("[ARC::Patching | {}] File '{}' has a new patched decompressed size: {:#x}", self.index, self.path.display().bright_yellow(),subfile.decomp_size.bright_red());
         }
     }
 }

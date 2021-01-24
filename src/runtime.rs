@@ -1,5 +1,5 @@
 use std::fmt;
-use std::sync::atomic::AtomicU32;
+//use std::sync::atomic::AtomicU32;
 
 use skyline::{
     nn,
@@ -67,10 +67,10 @@ impl fmt::Display for Table1Entry {
 }
 
 #[repr(C)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Table2Entry {
     pub data: *const u8,
-    pub ref_count: AtomicU32,
+    pub ref_count: u32,
     pub is_used: bool,
     pub state: FileState,
     pub file_flags2: bool,
@@ -95,6 +95,7 @@ impl fmt::Display for Table2Entry {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct LoadedTables {
     pub mutex: *mut nn::os::MutexType,
     pub table1: *mut Table1Entry,
@@ -126,12 +127,14 @@ pub struct LoadedDirectory {
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct LoadedData {
     pub arc: &'static mut LoadedArc,
-    pub search: &'static mut LoadedSearchSection,
+    //pub search: &'static mut LoadedSearchSection,
 }
 
 #[repr(C)]
+#[derive(Debug)]
 pub struct CppVector<T> {
     start: *const T,
     end: *const T,
@@ -151,20 +154,20 @@ impl LoadedTables {
         &self.loaded_data.arc
     }
 
-    #[allow(dead_code)]
-    pub fn get_search(&self) -> &LoadedSearchSection {
-        self.loaded_data.search
-    }
+    // #[allow(dead_code)]
+    // pub fn get_search(&self) -> &LoadedSearchSection {
+    //     self.loaded_data.search
+    // }
 
     #[allow(dead_code)]
     pub fn get_arc_mut(&mut self) -> &mut LoadedArc {
         &mut self.loaded_data.arc
     }
 
-    #[allow(dead_code)]
-    pub fn get_search_mut(&mut self) -> &LoadedSearchSection {
-        &mut self.loaded_data.search
-    }
+    // #[allow(dead_code)]
+    // pub fn get_search_mut(&mut self) -> &LoadedSearchSection {
+    //     &mut self.loaded_data.search
+    // }
 
     pub fn get_instance() -> &'static mut Self {
         unsafe {
@@ -183,7 +186,7 @@ impl LoadedTables {
         unsafe { std::slice::from_raw_parts(self.table1, self.table1_len as usize) }
     }
 
-    pub fn table_1_mut(&mut self) -> &mut [Table1Entry] {
+    pub fn table_1_mut<'a>(&mut self) -> &'a mut [Table1Entry] {
         unsafe { std::slice::from_raw_parts_mut(self.table1, self.table1_len as usize) }
     }
 
