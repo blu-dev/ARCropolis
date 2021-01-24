@@ -276,6 +276,10 @@ unsafe fn before_loaded_tables(_ctx: &InlineCtx) {
     unshared();
 }
 
+pub fn expand_table<T: Clone>(source: &[T]) -> Vec<T> {
+    source.clone().to_vec()
+}
+
 pub unsafe fn unshared() {
     let tables = LoadedTables::get_instance();
     //println!("{:?}", tables);
@@ -286,12 +290,7 @@ pub unsafe fn unshared() {
     let file_path_index = arc.get_file_path_index_from_hash(Hash40::from("fighter/marth/model/body/c00/model.numshb")).unwrap();
 
     // Here, we'll make a new FileInfoIndices table so we can add a new entry for the FilePath to refer to
-    let file_info_indices = arc.get_file_info_indices();
-    // Allocate a new table, copy the original content
-    let mut new_fileinfoindices: Box<Vec<FileInfoIndex>> = Box::new(Vec::new());
-    new_fileinfoindices.extend_from_slice(file_info_indices);
-    // We don't need the original FileInfoIndices table anymore, drop it
-    drop(file_info_indices);
+    let mut new_fileinfoindices = expand_table(arc.get_file_info_indices());
 
     // Get the FilePath for the hash
     let mut file_path = &mut *(&arc.get_file_paths()[file_path_index as usize] as *const FilePath as *mut FilePath);
@@ -300,7 +299,7 @@ pub unsafe fn unshared() {
     /// FileInfoIndices
 
     // Copy the original FileInfoIndex
-    let mut new_fileinfoindex = arc.get_file_info_indices()[file_path.path.index() as usize].clone();
+    let mut new_fileinfoindex = arc.get_file_info_indices()[file_path.path.index() as usize];
     //println!("FileInfoIndex before: {:#?}", new_fileinfoindex);
     // Increment the FileInfo count by one for our future new entry
     new_fileinfoindex.file_info_index = arc.get_file_infos().len() as u32;
@@ -308,19 +307,12 @@ pub unsafe fn unshared() {
     // Add our edited copy to the end of our new table
     new_fileinfoindices.push(new_fileinfoindex);
     info!("FileInfoIndices table new size: {}", new_fileinfoindices.len());
-    // We drop this since we won't need it anymore
-    drop(new_fileinfoindex);
 
 
     /// FileInfos
 
     // Make a new FileInfo table so we can add a new entry for the FileInfoIndex to refer to
-    let file_infos = arc.get_file_infos();
-    // Allocate a new table, copy the original content
-    let mut new_fileinfos: Box<Vec<FileInfo>> = Box::new(Vec::new());
-    new_fileinfos.extend_from_slice(file_infos);
-    // We don't need the original FileInfo table anymore, drop it
-    drop(file_infos);
+    let mut new_fileinfos = expand_table(arc.get_file_infos());
 
     // Get the original FileInfo so we can copy it
     let mut new_fileinfo = arc.get_file_info_from_path_index(file_path_index).clone();
@@ -336,8 +328,6 @@ pub unsafe fn unshared() {
     // Add our edited copy to the end of our new table
     new_fileinfos.push(new_fileinfo);
     info!("FileInfos table new size: {}", new_fileinfos.len());
-    // We drop the new FileInfo now that it has been pushed to the table
-    drop(new_fileinfo);
 
 
     /// Table pointers replacement
@@ -345,7 +335,6 @@ pub unsafe fn unshared() {
     // Now that all the tables have been extended and we don't need to reference Set the index to point to the new entry at the end of the FileInfoIndices table
     file_path.path.set_index(new_fileinfoindices.len() as u32 - 1);
     info!("File_path path.index: {}", file_path.path.index());
-    drop(file_path);
 
     // Free the original FileInfoIndex table and replace by our own
     let orig_pointer = arc.file_info_indices;
@@ -360,10 +349,6 @@ pub unsafe fn unshared() {
     // Increase the FileInfoIndice count
     fs_header.file_info_index_count += 1;
     fs_header.file_info_count += 1;
-    drop(fs_header);
-
-    // We have everything we need here
-    drop(arc);
 }
 
 #[skyline::main(name = "arcropolis")]
