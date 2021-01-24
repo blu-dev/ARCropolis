@@ -271,13 +271,13 @@ fn initial_loading(_ctx: &InlineCtx) {
 }
 
 // Before the tables are initialized, so they're automatically initialized with the right size
-#[hook(offset = 0x35c641c, inline)]
+#[hook(offset = 0x35c640c, inline)]
 unsafe fn before_loaded_tables(_ctx: &InlineCtx) {
     unshared();
 }
 
 pub fn expand_table<T: Clone>(source: &[T]) -> Vec<T> {
-    source.clone().to_vec()
+    source.to_vec()
 }
 
 pub unsafe fn unshared() {
