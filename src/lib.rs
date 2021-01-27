@@ -7,6 +7,7 @@ use std::io::prelude::*;
 use std::ffi::CStr;
 use std::net::IpAddr;
 
+
 use skyline::{hook, hooks::InlineCtx, install_hooks, libc, nn, println};
 
 
@@ -33,7 +34,7 @@ mod selector;
 mod logging;
 use log::{ trace, info };
 
-use smash_arc::{ArcLookup, FileInfo, FileInfoIndex, FilePath, FileSystemHeader, Hash40, FileInfoFlags };
+use smash_arc::{ArcLookup, FileInfo, FileInfoFlags, FileInfoIndex, FilePath, FileSystemHeader, Hash40, LoadedArc, LoadedDirInfo};
 
 fn get_filectx_by_index<'a>(table2_idx: u32) -> Option<(parking_lot::MappedRwLockReadGuard<'a, FileCtx>, &'a mut Table2Entry)> {
     let tables = LoadedTables::get_instance();
@@ -236,7 +237,7 @@ unsafe fn manual_hook(page_path: *const u8, unk2: *const u8, unk3: *const u64, u
     }
 }
 
-#[hook(offset = INITIAL_LOADING_OFFSET, inline)]
+#[hook(offset = 0x35b3f40, inline)]
 fn initial_loading(_ctx: &InlineCtx) {
     logging::init(CONFIG.read().logger.as_ref().unwrap().logger_level.into()).unwrap();
 
@@ -263,7 +264,7 @@ fn initial_loading(_ctx: &InlineCtx) {
     unsafe {
         nn::oe::SetCpuBoostMode(nn::oe::CpuBoostMode::Boost);
 
-        //unshared();
+        unshared();
         lazy_static::initialize(&ARC_FILES);
 
         nn::oe::SetCpuBoostMode(nn::oe::CpuBoostMode::Disabled);
@@ -271,13 +272,26 @@ fn initial_loading(_ctx: &InlineCtx) {
 }
 
 // Before the tables are initialized, so they're automatically initialized with the right size
-#[hook(offset = 0x35c640c, inline)]
+#[hook(offset = 0x35c6488, inline)]
 unsafe fn before_loaded_tables(_ctx: &InlineCtx) {
-    unshared();
+    //unshared();
 }
 
 pub fn expand_table<T: Clone>(source: &[T]) -> Vec<T> {
-    source.to_vec()
+    let mut vec = Vec::with_capacity(source.len() + 1);
+    vec.extend_from_slice(source);
+    vec
+}
+
+pub fn find_file_info_index_in_dir_info(arc: &LoadedArc, file_path: &FilePath, dir: &LoadedDirInfo) -> Option<usize> {
+    (dir.file_info_start_index as usize .. (dir.file_info_start_index + dir.file_info_count) as usize).find(|index| {
+        if arc.get_file_infos()[*index as usize].hash_index_2 == file_path.path.index() {
+            println!("Matching FileInfoIndex found for FileInfo index: {}", index);
+            true
+        } else {
+            false
+        }
+    })
 }
 
 pub unsafe fn unshared() {
@@ -289,66 +303,108 @@ pub unsafe fn unshared() {
     // Get the index of the FilePath for this specific entry. Marth's original c00 numshb path.index() is 143623. This has to be changed to 156923 (FileInfoIndices.len() + 1) for testing purposes.
     let file_path_index = arc.get_file_path_index_from_hash(Hash40::from("fighter/marth/model/body/c00/model.numshb")).unwrap();
 
-    // Here, we'll make a new FileInfoIndices table so we can add a new entry for the FilePath to refer to
-    let mut new_fileinfoindices = expand_table(arc.get_file_info_indices());
-
     // Get the FilePath for the hash
     let mut file_path = &mut *(&arc.get_file_paths()[file_path_index as usize] as *const FilePath as *mut FilePath);
+    
+    let dir = arc.get_loaded_dir_info_from_hash(Hash40::from("fighter/marth/c00")).unwrap();
+    let info_index = find_file_info_index_in_dir_info(arc, file_path, dir).unwrap();
+    println!("File_path path.index(): {}", file_path.path.index());
 
 
     /// FileInfoIndices
 
+    // Here, we'll make a new FileInfoIndices table so we can add a new entry for the FilePath to refer to
+    let mut new_fileinfoindices = expand_table(arc.get_file_info_indices());
     // Copy the original FileInfoIndex
-    let mut new_fileinfoindex = arc.get_file_info_indices()[file_path.path.index() as usize];
-    //println!("FileInfoIndex before: {:#?}", new_fileinfoindex);
-    // Increment the FileInfo count by one for our future new entry
-    new_fileinfoindex.file_info_index = arc.get_file_infos().len() as u32;
-    //println!("FileInfoIndex after: {:#?}", new_fileinfoindex);
+    let mut new_fileinfoindex = arc.get_file_info_indices()[file_path.path.index() as usize].clone();
+    // Set the FileInfo index to our new FileInfo
+    new_fileinfoindex.file_info_index = info_index as u32;
     // Add our edited copy to the end of our new table
     new_fileinfoindices.push(new_fileinfoindex);
-    info!("FileInfoIndices table new size: {}", new_fileinfoindices.len());
+    info!("New FileInfoIndices table len: {}", new_fileinfoindices.len());
+    info!("New FileInfoIndex: {:#?}", new_fileinfoindex);
 
 
     /// FileInfos
 
-    // Make a new FileInfo table so we can add a new entry for the FileInfoIndex to refer to
-    let mut new_fileinfos = expand_table(arc.get_file_infos());
-
     // Get the original FileInfo so we can copy it
-    let mut new_fileinfo = arc.get_file_info_from_path_index(file_path_index).clone();
+    //let mut new_fileinfo = new_fileinfos[arc.get_file_info_indices()[file_path.path.index() as usize].file_info_index as usize].clone();
+    let info_data_len = arc.get_file_info_to_datas().len() as u32;
 
-    //println!("FileInfo before: {:#?}", new_fileinfo);
+    let mut new_fileinfo = &mut arc.get_file_infos_mut()[info_index];
+    let original_fileinfo = new_fileinfo.clone();
+
+    println!("FileInfo before: {:#?}", new_fileinfo);
 
     // Set the FileInfoIndices index of the FileInfo to our new FileInfoIndex
-    new_fileinfo.hash_index_2 = new_fileinfoindices.len() as u32;
-    new_fileinfo.flags.set_is_redirect(false); // Is this actually necessary? Seems unused in Smash's code
+    //println!("New FileInfo hash_index_2: {}", new_fileinfoindices.len());
+    new_fileinfo.hash_index_2 = new_fileinfoindices.len() as u32 - 1;
+    new_fileinfo.info_to_data_index = info_data_len;
+    new_fileinfo.flags.set_is_redirect(true); // Is this actually necessary? Seems unused in Smash's code
+
+    println!("FileInfo after: {:#?}", new_fileinfo);
+
+
+    /// FileInfoToDatas
+    
+    let mut new_info_to_datas = expand_table(arc.get_file_info_to_datas());
+    let mut new_info_to_data = arc.get_file_in_folder_mut(&original_fileinfo, smash_arc::Region::EuFrench).clone();
+    println!("Original InfoToData: {:#?}", new_info_to_data);
+    // new_info_to_data.file_info_index_and_flag
+    new_info_to_data.file_data_index = arc.get_file_datas().len() as u32;
+    new_info_to_datas.push(new_info_to_data);
+    println!("New InfoToData: {:#?}", new_info_to_data);
+
+    // FileDatas
+
+    let mut new_filedatas = expand_table(arc.get_file_datas());
+    let mut new_filedata = arc.get_file_data(&original_fileinfo, smash_arc::Region::EuFrench).clone();
+    new_filedatas.push(new_filedata);
+    println!("New FileData table len: {}", new_filedatas.len());
+
+    
+
+    //println!("FileInfo after: {:#?}", new_fileinfo);
+
+    /// Table pointers replacement
+    // Set the new FileInfoIndex for this path
+    file_path.path.set_index(new_fileinfoindices.len() as u32 - 1);
+    println!("Edited File_path path.index(): {}", file_path.path.index());
+
+    let mut new_table2 = expand_table(LoadedTables::get_instance().table_2());
+    let mut new_table2entry = new_table2[0].clone();
 
     //println!("FileInfo after: {:#?}", new_fileinfo);
 
     // Add our edited copy to the end of our new table
-    new_fileinfos.push(new_fileinfo);
-    info!("FileInfos table new size: {}", new_fileinfos.len());
+    new_table2.push(new_table2entry);
 
-
-    /// Table pointers replacement
-
-    // Now that all the tables have been extended and we don't need to reference Set the index to point to the new entry at the end of the FileInfoIndices table
-    file_path.path.set_index(new_fileinfoindices.len() as u32 - 1);
-    info!("File_path path.index: {}", file_path.path.index());
+    LoadedTables::get_instance().get_t1_mut(file_path_index).unwrap().table2_index = new_fileinfoindices.len() as u32 - 1;
 
     // Free the original FileInfoIndex table and replace by our own
-    let orig_pointer = arc.file_info_indices;
-    //skyline::libc::free(orig_pointer as *mut libc::c_void);
+    // let orig_pointer = arc.file_info_indices;
+    // skyline::libc::free(orig_pointer as *mut libc::c_void);
     arc.file_info_indices = Box::leak(new_fileinfoindices.into_boxed_slice()).as_mut_ptr();
+    //arc.file_infos = Box::leak(new_fileinfos.into_boxed_slice()).as_mut_ptr();
+    arc.file_info_to_datas = Box::leak(new_info_to_datas.into_boxed_slice()).as_mut_ptr();
+    arc.file_datas = Box::leak(new_filedatas.into_boxed_slice()).as_mut_ptr();
+    // let orig_pointer = arc.file_infos;
+    // skyline::libc::free(orig_pointer as *mut libc::c_void);
 
-    arc.file_infos = Box::leak(new_fileinfos.into_boxed_slice()).as_mut_ptr();
+    LoadedTables::get_instance().table2 = Box::leak(new_table2.into_boxed_slice()).as_mut_ptr();
+    LoadedTables::get_instance().table2_len += 1;
+
+    
+
+    //println!("Table2: {:#?}", LoadedTables::get_instance().table_2());
 
     
     // Write the new counts in the FileSystemHeader so Smash-arc is aware of the changes
     let mut fs_header = &mut *(arc.fs_header as *mut FileSystemHeader);
     // Increase the FileInfoIndice count
     fs_header.file_info_index_count += 1;
-    fs_header.file_info_count += 1;
+    fs_header.file_info_sub_index_count += 1;
+    fs_header.sub_file_count += 1;
 }
 
 #[skyline::main(name = "arcropolis")]
