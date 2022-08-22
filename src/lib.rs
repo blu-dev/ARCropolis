@@ -10,7 +10,7 @@
 use std::{
     alloc::GlobalAlloc,
     fmt,
-    io::{BufWriter, Write},
+    io::{BufWriter, Read, Seek, SeekFrom, Write},
     path::{Path, PathBuf},
     str::FromStr,
 };
@@ -18,8 +18,8 @@ use std::{
 use arcropolis_api::Event;
 use log::LevelFilter;
 use semver::Version;
-use skyline_config::{open_preselected_user, get_user_id, close_user, UserHandle};
-use smash_arc::{ArcLookup, LoadedSearchSection, SearchLookup};
+use skyline_config::{close_user, get_user_id, open_preselected_user, UserHandle};
+use smash_arc::{ArcLookup, LoadedSearchSection, Region, SearchLookup};
 use thiserror::Error;
 
 #[macro_use] extern crate lazy_static;
@@ -27,7 +27,11 @@ use thiserror::Error;
 #[macro_use] extern crate log;
 
 use parking_lot::RwLock;
-use skyline::{hooks::InlineCtx, libc::c_char, nn};
+use skyline::{
+    hooks::InlineCtx,
+    libc::c_char,
+    nn::{self, account::Uid},
+};
 
 mod api;
 mod chainloader;
@@ -282,6 +286,45 @@ fn show_eshop() {
     }
 }
 
+#[repr(u8)]
+pub enum SaveLanguageId {
+    Japanese = 0,
+    English,
+    French,
+    Spanish,
+    German,
+    Italian,
+    Dutch,
+    Russian,
+    Chinese,
+    Taiwanese,
+    Korean,
+}
+
+impl From<u8> for SaveLanguageId {
+    fn from(byte: u8) -> Self {
+        match byte {
+            0 => Self::Japanese,
+            1 => Self::English,
+            2 => Self::French,
+            3 => Self::Spanish,
+            4 => Self::German,
+            5 => Self::Italian,
+            6 => Self::Dutch,
+            7 => Self::Russian,
+            8 => Self::Chinese,
+            9 => Self::Taiwanese,
+            10 => Self::Korean,
+            _ => Self::English, // game does this don't @ me
+        }
+    }
+}
+
+extern "C" {
+    #[link_name = "_ZN2nn2fs7UnmountEPKc"]
+    fn nnfsUnmount(name: *const u8);
+}
+
 #[skyline::main(name = "arcropolis")]
 pub fn main() {
     // Initialize the time for the logger
@@ -297,42 +340,87 @@ pub fn main() {
     }
 
     let mut uid = nn::account::Uid { id: [0; 2] };
-        let mut handle = UserHandle::new();
+    let mut handle = UserHandle::new();
 
-        unsafe {
-            // It is safe to initialize multiple times.
-            nn::account::Initialize();
+    unsafe {
+        // It is safe to initialize multiple times.
+        nn::account::Initialize();
 
-            // This provides a UserHandle and sets the User in a Open state to be used.
-            if !open_preselected_user(&mut handle) {
-                panic!("OpenPreselectedUser returned false");
-            }
-
-            // Obtain the UID for this user
-            get_user_id(&mut uid, &handle);
-
-            nn::fs::MountSaveData(skyline::c_str("save\0"), &uid);
-
-            std::fs::read_dir("save:/save_data/").unwrap().for_each(|entry| {
-                let entry = entry.unwrap();
-
-                println!("Path: {}", entry.path().display());
-            });
-
-            let save = std::fs::read("save:/save_data/system_data.bin").unwrap();
-
-            skyline::logging::hex_dump_ptr(save.as_ptr().offset(0x3c6090));
-
-            let language = save[0x3c6098] as usize;
-            let region = save[0x3c6099] as usize;
-
-            println!("Region: {:?}", smash_arc::Region::from(language + region + 1));
-
-            nn::fs::Unmount(skyline::c_str("save\0"));
-
-            // This closes the UserHandle, making it unusable, and sets the User in a Closed state.
-            close_user(&handle);
+        // This provides a UserHandle and sets the User in a Open state to be used.
+        if !open_preselected_user(&mut handle) {
+            panic!("OpenPreselectedUser returned false");
         }
+
+        // Obtain the UID for this user
+        get_user_id(&mut uid, &handle);
+
+        // TODO: CHANGE THIS IN UPSTREAM NNSDK-RS TO HAVE THE RIGHT SYMBOL
+        nn::fs::MountSaveData(skyline::c_str("save\0"), &uid as *const Uid as u64);
+
+        std::fs::read_dir("save:/save_data/").unwrap().for_each(|entry| {
+            let entry = entry.unwrap();
+
+            println!("Path: {}", entry.path().display());
+        });
+
+        let mut file = std::fs::File::open("save:/save_data/system_data.bin").unwrap();
+        file.seek(SeekFrom::Start(0x3c6098)).unwrap();
+        let mut language_code = [0u8];
+        file.read(&mut language_code).unwrap();
+        drop(file);
+
+        nnfsUnmount(skyline::c_str("save\0"));
+
+        // This closes the UserHandle, making it unusable, and sets the User in a Closed state.
+        close_user(&handle);
+
+        let language = SaveLanguageId::from(language_code[0]);
+
+        let system_locale_id = *(skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as *const u32).add(0x523b00c / 4);
+        let system_region_map = std::slice::from_raw_parts(
+            (skyline::hooks::getRegionAddress(skyline::hooks::Region::Text) as *const u32).add(0x4740f90 / 4),
+            14,
+        );
+
+        let system_region = system_region_map[system_locale_id as usize];
+
+        let region = match language {
+            SaveLanguageId::Japanese => Region::Japanese,
+            SaveLanguageId::English => {
+                if system_region == 1 {
+                    // US
+                    Region::UsEnglish
+                } else {
+                    Region::EuEnglish
+                }
+            },
+            SaveLanguageId::French => {
+                if system_region == 1 {
+                    // US
+                    Region::UsFrench
+                } else {
+                    Region::EuFrench
+                }
+            },
+            SaveLanguageId::Spanish => {
+                if system_region == 1 {
+                    // US
+                    Region::UsSpanish
+                } else {
+                    Region::EuSpanish
+                }
+            },
+            SaveLanguageId::German => Region::EuGerman,
+            SaveLanguageId::Dutch => Region::EuDutch,
+            SaveLanguageId::Italian => Region::EuItalian,
+            SaveLanguageId::Russian => Region::EuRussian,
+            SaveLanguageId::Chinese => Region::ChinaChinese,
+            SaveLanguageId::Taiwanese => Region::TaiwanChinese,
+            SaveLanguageId::Korean => Region::Korean,
+        };
+
+        println!("Region: {:?}", region);
+    }
 
     // if ninput::any::is_down(ninput::Buttons::PLUS) {
     //     println!("input");

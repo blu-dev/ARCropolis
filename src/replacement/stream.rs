@@ -1,5 +1,5 @@
 use skyline::libc::c_char;
-use smash_arc::{ArcLookup, Hash40, LoadedArc};
+use smash_arc::{ArcLookup, Hash40, LoadedArc, Region};
 
 use crate::{hashes, offsets};
 
@@ -38,7 +38,7 @@ fn lookup_stream_hash(out_path: *mut c_char, loaded_arc: &LoadedArc, size_out: &
     }
 
     // query information from the arc via a smash_arc lookup instead of calling the original function
-    match loaded_arc.get_stream_data(hash) {
+    match loaded_arc.get_stream_data(hash, Region::None) {
         Ok(stream_data) => {
             *size_out = stream_data.size as usize;
             *offset_out = stream_data.offset;
